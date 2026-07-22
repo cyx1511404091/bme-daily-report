@@ -554,7 +554,7 @@ def generate_summary(title, abstract, zone=""):
             method.append("构建新型生物传感检测平台")
 
     if not method:
-        method.append("通过系统的实验研究")
+        method.append("进行了系统的实验研究")
 
     # ========================
     #  3. 关键发现/成果
@@ -665,35 +665,52 @@ def generate_summary(title, abstract, zone=""):
         apps.append("为该领域的进一步发展提供了重要参考")
 
     # ========================
-    #  5. 拼合为完整段落（更详细的总结）
+    #  5. 拼合为一大段完整总结（流畅自然语言）
     # ========================
-    # 研究背景 + 方法（取前3个方法）
-    method_str = "；".join(method[:3]) if method else "通过系统的实验研究"
-    sentence1 = bg[0] + "，" + method_str + "。"
+    # 摘要关键信息提取
+    abstract_short = abstract[:300].strip()
+    if len(abstract) > 300:
+        last_period = abstract_short.rfind(".")
+        if last_period > 120:
+            abstract_short = abstract_short[:last_period + 1]
 
-    # 关键发现（全取，最多4个）
-    n_findings = min(len(findings), 4)
-    if n_findings == 1:
-        sentence2 = "结果表明，" + findings[0] + "。"
+    # 方法
+    method_str = "、".join(method[:3]) if method else "进行了系统的实验研究"
+
+    # 发现
+    if len(findings) >= 2:
+        finding_str = "，".join(findings[:4])
     else:
-        sentence2 = "结果表明，" + "；".join(findings[:n_findings]) + "。"
+        finding_str = findings[0] if findings else "验证了该方法的可行性与有效性"
 
-    # 应用前景（取前2个）
+    # 前景
     if len(apps) >= 2:
-        app_str = apps[0] + "，同时" + apps[1]
+        app_str = apps[0] + "，" + apps[1]
     else:
-        app_str = apps[0]
-    sentence3 = "该研究" + app_str + "。"
+        app_str = apps[0] if apps else "为该领域进一步发展提供了重要参考"
 
-    # 合并
-    result = sentence1 + " " + sentence2 + " " + sentence3
+    # 拼成一段完整的话
+    result = (
+        f"{bg[0]}，本研究{method_str}。"
+        f"结果显示，{finding_str}。"
+        f"该研究{app_str}。"
+    )
 
-    # 分区标记
+    # 融合摘要关键信息（在第一个句号后插入摘要精华）
+    if abstract_short and len(abstract_short) > 30:
+        key_info = translate_text(abstract_short[:200])
+        first_sent = key_info.split(".")[0] if "." in key_info else key_info[:150]
+        if len(first_sent) > 20:
+            first_period = result.find("。")
+            if first_period > 0:
+                result = result[:first_period + 1] + f"具体而言，{first_sent}。" + result[first_period + 1:]
+
+    # 分区标记（放在末尾）
     if zone and "区" in zone:
         if "1" in zone:
-            result += "【中科院1区期刊】"
+            result += "【中科院1区】"
         elif "2" in zone:
-            result += "【中科院2区期刊】"
+            result += "【中科院2区】"
 
     return result
 
@@ -1012,22 +1029,22 @@ def generate_html(all_papers, any_fallback=False):
             journal_full = p["journal"]
 
             sections += f"""
-<div style="margin:12px 0;padding:16px;background:#f8f9fa;border-radius:8px;border-left:3px solid {zone_color if zone else c};">
-<div style="font-weight:bold;font-size:16px;margin-bottom:6px;line-height:1.4;color:#1a1a2e;">
+<div style="margin:16px 0;padding:20px;background:#fafbfc;border-radius:10px;border-left:4px solid {zone_color if zone else c};">
+<div style="font-weight:bold;font-size:17px;margin-bottom:8px;line-height:1.5;color:#1a1a2e;">
     <a href="{p['url']}" style="color:#1a1a2e;text-decoration:none;" target="_blank">{p['title_zh']}</a>
 </div>
-<div style="color:#888;font-size:12px;margin-bottom:10px;display:flex;align-items:center;flex-wrap:wrap;gap:6px;">
+<div style="color:#888;font-size:12px;margin-bottom:14px;display:flex;align-items:center;flex-wrap:wrap;gap:8px;">
     <span style="color:#2c3e50;font-weight:700;font-size:13px;">📰 {journal_full}</span>
     {zone_tag}{fb_tag}
     <span>{p.get('date','')}</span>
-    <span>{p['authors']}</span>
+    <span style="color:#999;">{p['authors']}</span>
 </div>
-<div style="background:#fff;padding:12px 14px;border-radius:6px;font-size:13px;color:#333;line-height:1.8;border:1px solid #e0e0e0;">
-    <span style="color:{c};font-weight:bold;font-size:14px;">📌 总结</span><br>
-    <span style="color:#444;">{p['summary']}</span>
+<div style="background:#fff;padding:14px 16px;border-radius:8px;font-size:14px;color:#333;line-height:2;border:1px solid #e8e8e8;">
+    <div style="color:#888;font-size:12px;margin-bottom:4px;">📌 核心总结</div>
+    <div style="color:#222;">{p['summary']}</div>
 </div>
-<div style="color:#aaa;font-size:11px;line-height:1.3;margin-top:8px;padding:6px 8px;background:#f0f0f0;border-radius:4px;">
-    <em>原标题：{p['title_en'][:200]}{'...' if len(p.get('title_en',''))>200 else ''}</em>
+<div style="color:#bbb;font-size:11px;line-height:1.4;margin-top:8px;">
+    原标题：{p['title_en'][:200]}{'...' if len(p.get('title_en',''))>200 else ''}
 </div>
 </div>"""
 
@@ -1106,9 +1123,13 @@ def main():
 
     for topic, query in TOPICS.items():
         print(f"\n[{topic}]")
-        papers, is_fallback = fetch_pubmed(query, 4, days=7)
-        # 仅保留 1区/2区 论文
+        papers, is_fallback = fetch_pubmed(query, 5, days=7)
+        # 仅保留1区/2区，优先1区，每领域最多取1篇
         papers = [p for p in papers if p.get("zone") in ("1区", "2区")]
+        # 按分区排序：1区优先
+        papers.sort(key=lambda p: 0 if p.get("zone") == "1区" else 1)
+        # 只取第1篇（最优）
+        papers = papers[:1]
         new_papers = [p for p in papers if p["pmid"] not in cache["pmids"]]
         if new_papers:
             all_papers[topic] = new_papers
@@ -1116,7 +1137,7 @@ def main():
                 cache["pmids"].append(p["pmid"])
                 zone_str = f" [{p.get('zone','')}]" if p.get("zone") else ""
                 fb = " [回退]" if p.get("is_fallback") else ""
-                print(f"  {p['journal'][:35]}{zone_str}{fb} → {p['title_zh'][:60]}...")
+                print(f"  {p['journal'][:40]}{zone_str}{fb} → {p['title_zh'][:60]}...")
                 if p.get("is_fallback"):
                     fallback_count += 1
                     any_fallback = True
