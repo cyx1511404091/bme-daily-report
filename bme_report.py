@@ -152,6 +152,10 @@ CAS_ZONE = {
     "frontiers in cellular neuroscience": ("2区", "医学", "Front Cell Neurosci"),
     "journal of neuroengineering":      ("2区", "医学", "J Neuroeng Rehabil"),
     "ieee reviews in biomedical engineering": ("2区", "医学", "IEEE Rev Biomed Eng"),
+    "journal of diabetes science":      ("2区", "医学", "J Diabetes Sci Technol"),
+    "jmir formative":                   ("2区", "医学", "JMIR Form Res"),
+    "jmir mhealth":                     ("2区", "医学", "JMIR Mhealth Uhealth"),
+    "jmir":                             ("2区", "医学", "JMIR"),
     "annual review of biomedical engineering": ("2区", "医学", "Annu Rev Biomed Eng"),
     "cancer research":                  ("2区", "医学", "Cancer Res"),
     "clinical cancer research":         ("2区", "医学", "Clin Cancer Res"),
@@ -661,17 +665,27 @@ def generate_summary(title, abstract, zone=""):
         apps.append("为该领域的进一步发展提供了重要参考")
 
     # ========================
-    #  5. 拼合为完整段落
+    #  5. 拼合为完整段落（更详细的总结）
     # ========================
-    # 研究背景 + 方法
-    sentence1 = bg[0] + "，" + "；".join(method[:2]) + "。"
+    # 研究背景 + 方法（取前3个方法）
+    method_str = "；".join(method[:3]) if method else "通过系统的实验研究"
+    sentence1 = bg[0] + "，" + method_str + "。"
 
-    # 关键发现
-    sentence2 = "结果表明，" + "，".join(findings[:3]) + "。"
+    # 关键发现（全取，最多4个）
+    n_findings = min(len(findings), 4)
+    if n_findings == 1:
+        sentence2 = "结果表明，" + findings[0] + "。"
+    else:
+        sentence2 = "结果表明，" + "；".join(findings[:n_findings]) + "。"
 
-    # 应用前景
-    sentence3 = "该研究" + apps[0] + "。"
+    # 应用前景（取前2个）
+    if len(apps) >= 2:
+        app_str = apps[0] + "，同时" + apps[1]
+    else:
+        app_str = apps[0]
+    sentence3 = "该研究" + app_str + "。"
 
+    # 合并
     result = sentence1 + " " + sentence2 + " " + sentence3
 
     # 分区标记
@@ -941,12 +955,10 @@ def generate_html(all_papers, any_fallback=False):
     fb_count = sum(1 for papers in all_papers.values() for p in papers if p.get("is_fallback"))
 
     zone_colors = {
-        "1区": "#e74c3c", "2区": "#e67e22", "3区": "#7f8c8d", "4区": "#bdc3c7",
-        "预印本": "#3498db",
+        "1区": "#e74c3c", "2区": "#e67e22",
     }
     zone_badges = {
-        "1区": "🏆 1区", "2区": "🥈 2区", "3区": "🥉 3区", "4区": "4区",
-        "预印本": "📝 预印本",
+        "1区": "🏆 中科院1区", "2区": "🥈 中科院2区",
     }
     topic_colors = {
         "🧬 生物材料": "#27ae60", "🖥️ 医学影像与AI": "#2980b9",
@@ -956,10 +968,9 @@ def generate_html(all_papers, any_fallback=False):
         "📄 arXiv预印本": "#7f8c8d",
     }
 
-    # 按分区排序：1区 > 2区 > 3区 > 4区 > 预印本
+    # 按分区排序
     def sort_key(topic_papers):
-        zone_order = {"1区": 0, "2区": 1, "3区": 2, "4区": 3, "预印本": 4}
-        # 取该topic下第一篇的分区作为排序依据（每个topic下再各自排序）
+        zone_order = {"1区": 0, "2区": 1}
         return 99
 
     sections = ""
@@ -967,14 +978,13 @@ def generate_html(all_papers, any_fallback=False):
         if not papers:
             continue
 
-        # 每个topic内按分区排序
+        # 仅保留1区2区
         papers_sorted = sorted(papers, key=lambda p: {
-            "1区": 0, "2区": 1, "3区": 2, "4区": 3, "预印本": 4, None: 5
-        }.get(p.get("zone"), 5))
+            "1区": 0, "2区": 1
+        }.get(p.get("zone"), 9))
 
         c = topic_colors.get(topic, "#333")
 
-        # 统计分区分布
         zone1 = sum(1 for p in papers_sorted if p.get("zone") == "1区")
         zone2 = sum(1 for p in papers_sorted if p.get("zone") == "2区")
         zone_count_str = ""
@@ -990,39 +1000,34 @@ def generate_html(all_papers, any_fallback=False):
             zone_color = zone_colors.get(zone, "#999") if zone else "#999"
             zone_badge = zone_badges.get(zone, "") if zone else ""
 
-            # 分区标签
             zone_tag = ""
             if zone:
-                zone_tag = f'<span style="display:inline-block;background:{zone_color};color:#fff;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:bold;margin-left:6px;">{zone_badge}</span>'
+                zone_tag = f'<span style="display:inline-block;background:{zone_color};color:#fff;padding:2px 10px;border-radius:10px;font-size:11px;font-weight:bold;margin-left:8px;">{zone_badge}</span>'
 
-            # 回退标记（本周精选）
             fb_tag = ""
             if p.get("is_fallback"):
                 fb_tag = ' <span style="display:inline-block;background:#6c5ce7;color:#fff;padding:2px 6px;border-radius:3px;font-size:10px;margin-left:4px;">🔄 本周</span>'
 
-            # 期刊简称
-            abbr_str = p.get("journal_abbr", p["journal"])[:35]
+            # 期刊全名
+            journal_full = p["journal"]
 
             sections += f"""
-<div style="margin:10px 0;padding:14px;background:#f8f9fa;border-radius:8px;border-left:3px solid {zone_color if zone else c};">
-<div style="display:flex;align-items:flex-start;justify-content:space-between;">
-    <div style="flex:1;">
-        <div style="font-weight:bold;font-size:15px;margin-bottom:4px;line-height:1.4;color:#2c3e50;">
-            <a href="{p['url']}" style="color:#2c3e50;text-decoration:none;" target="_blank">{p['title_zh']}</a>
-        </div>
-        <div style="color:#888;font-size:11px;margin-bottom:8px;">
-            <span style="color:#555;font-weight:600;">{abbr_str}</span>
-            {zone_tag}{fb_tag}
-            <span style="margin-left:6px;">{p.get('date','')}</span>
-            <span style="margin-left:6px;">{p['authors']}</span>
-        </div>
-        <div style="background:#fff;padding:8px 10px;border-radius:4px;font-size:13px;color:#444;line-height:1.6;border:1px solid #eee;">
-            <span style="color:{c};font-weight:bold;">📌 总结：</span>{p['summary']}
-        </div>
-        <div style="color:#aaa;font-size:11px;line-height:1.3;margin-top:6px;">
-            <em>原标题：{p['title_en'][:180]}{'...' if len(p.get('title_en',''))>180 else ''}</em>
-        </div>
-    </div>
+<div style="margin:12px 0;padding:16px;background:#f8f9fa;border-radius:8px;border-left:3px solid {zone_color if zone else c};">
+<div style="font-weight:bold;font-size:16px;margin-bottom:6px;line-height:1.4;color:#1a1a2e;">
+    <a href="{p['url']}" style="color:#1a1a2e;text-decoration:none;" target="_blank">{p['title_zh']}</a>
+</div>
+<div style="color:#888;font-size:12px;margin-bottom:10px;display:flex;align-items:center;flex-wrap:wrap;gap:6px;">
+    <span style="color:#2c3e50;font-weight:700;font-size:13px;">📰 {journal_full}</span>
+    {zone_tag}{fb_tag}
+    <span>{p.get('date','')}</span>
+    <span>{p['authors']}</span>
+</div>
+<div style="background:#fff;padding:12px 14px;border-radius:6px;font-size:13px;color:#333;line-height:1.8;border:1px solid #e0e0e0;">
+    <span style="color:{c};font-weight:bold;font-size:14px;">📌 总结</span><br>
+    <span style="color:#444;">{p['summary']}</span>
+</div>
+<div style="color:#aaa;font-size:11px;line-height:1.3;margin-top:8px;padding:6px 8px;background:#f0f0f0;border-radius:4px;">
+    <em>原标题：{p['title_en'][:200]}{'...' if len(p.get('title_en',''))>200 else ''}</em>
 </div>
 </div>"""
 
@@ -1031,7 +1036,7 @@ def generate_html(all_papers, any_fallback=False):
         sections = """
 <div style="text-align:center;padding:40px;color:#999;">
     <div style="font-size:48px;margin-bottom:10px;">📭</div>
-    <div style="font-size:16px;">今日暂无该领域最新论文</div>
+    <div style="font-size:16px;">今日暂无1区/2区最新论文</div>
     <div style="font-size:12px;margin-top:8px;">PubMed数据库可能存在1-2天延迟，请明天再查看</div>
 </div>"""
 
@@ -1041,7 +1046,7 @@ def generate_html(all_papers, any_fallback=False):
 
     stats = ""
     if zone1_total > 0 or zone2_total > 0:
-        stats = f'<div style="text-align:center;font-size:12px;color:#666;margin:8px 0;">🏆 1区 {zone1_total} 篇 | 🥈 2区 {zone2_total} 篇 | 总计 {total} 篇</div>'
+        stats = f'<div style="text-align:center;font-size:13px;color:#555;margin:8px 0;font-weight:bold;">🏆 中科院1区 {zone1_total} 篇 &nbsp;|&nbsp; 🥈 中科院2区 {zone2_total} 篇 &nbsp;|&nbsp; 📊 总计 {total} 篇</div>'
 
     # 标题区 — 根据是否有回退动态调整
     period_desc = ""
@@ -1060,7 +1065,7 @@ def generate_html(all_papers, any_fallback=False):
 
 <div style="text-align:center;padding-bottom:16px;border-bottom:2px solid #2c3e50;margin-bottom:10px;">
     <h1 style="color:#1a1a1a;margin:0 0 6px;font-size:22px;">🔬 生物医学工程 · 前沿日报</h1>
-    <p style="color:#999;margin:0;font-size:13px;">{today_str} · {period_desc} · 含中科院分区 & 总结要点</p>
+    <p style="color:#999;margin:0;font-size:13px;">{today_str} · {period_desc} · 仅展示中科院1区/2区期刊</p>
 </div>
 
 {stats}
@@ -1073,9 +1078,8 @@ def generate_html(all_papers, any_fallback=False):
 
 <div style="background:#eaf2f8;padding:12px;border-left:4px solid #2980b9;margin:20px 0 0;border-radius:4px;font-size:12px;line-height:1.6;">
 <strong>📌 说明</strong><br>
-• 📅 <strong>当日发表</strong> 为今天正式出版的最新论文 · 来源 PubMed / arXiv<br>
-• 🔄 <strong>本周精选</strong> 为当日无更新时自动回退近7天的高质量论文<br>
-• <span style="color:#e74c3c;">🏆 1区</span> / <span style="color:#e67e22;">🥈 2区</span> 为中科院期刊分区（2025年升级版，大类）<br>
+• 仅展示 <span style="color:#e74c3c;font-weight:bold;">🏆 中科院1区</span> 和 <span style="color:#e67e22;font-weight:bold;">🥈 中科院2区</span> 期刊论文（2025年升级版，大类分区）<br>
+• 📅 <strong>当日发表</strong> 为今天正式出版的最新论文 · 🔄 <strong>本周精选</strong> 为当日无更新时自动回退近7天<br>
 • 中文标题由术语替换生成，总结要点由规则引擎自动提炼 · 仅供参考，请以原文为准
 </div>
 
@@ -1103,6 +1107,8 @@ def main():
     for topic, query in TOPICS.items():
         print(f"\n[{topic}]")
         papers, is_fallback = fetch_pubmed(query, 4, days=7)
+        # 仅保留 1区/2区 论文
+        papers = [p for p in papers if p.get("zone") in ("1区", "2区")]
         new_papers = [p for p in papers if p["pmid"] not in cache["pmids"]]
         if new_papers:
             all_papers[topic] = new_papers
@@ -1110,49 +1116,14 @@ def main():
                 cache["pmids"].append(p["pmid"])
                 zone_str = f" [{p.get('zone','')}]" if p.get("zone") else ""
                 fb = " [回退]" if p.get("is_fallback") else ""
-                print(f"  {p['journal_abbr'][:25]}{zone_str}{fb} → {p['title_zh'][:60]}...")
+                print(f"  {p['journal'][:35]}{zone_str}{fb} → {p['title_zh'][:60]}...")
                 if p.get("is_fallback"):
                     fallback_count += 1
                     any_fallback = True
                 else:
                     today_count += 1
         else:
-            print(f"  无新论文（近一周也无）")
+            print(f"  无1区/2区新论文")
         time.sleep(1)
 
-    # arXiv
-    print("\n[arXiv] 生物医学工程...")
-    arxiv, arxiv_fb = fetch_arxiv("biomedical OR tissue engineering OR medical imaging OR drug delivery OR biosensor", 3)
-    new_arxiv = [p for p in arxiv if p["pmid"] not in cache["pmids"]]
-    if new_arxiv:
-        all_papers["📄 arXiv预印本"] = new_arxiv
-        for p in new_arxiv:
-            cache["pmids"].append(p["pmid"])
-            fb = " [回退]" if p.get("is_fallback") else ""
-            print(f"  arXiv{fb} → {p['title_zh'][:60]}...")
-            if p.get("is_fallback"):
-                fallback_count += 1
-                any_fallback = True
-            else:
-                today_count += 1
-    if arxiv_fb:
-        any_fallback = True
-    print(f"  arXiv: {len(new_arxiv)} 篇")
-
-    total = sum(len(v) for v in all_papers.values())
-    zone1 = sum(1 for papers in all_papers.values() for p in papers if p.get("zone") == "1区")
-    zone2 = sum(1 for papers in all_papers.values() for p in papers if p.get("zone") == "2区")
-    print(f"\n总计: {total} 篇 (1区: {zone1}, 2区: {zone2}, 今日: {today_count}, 回退: {fallback_count})")
-
-    html = generate_html(all_papers, any_fallback)
-    period = "今日" if not any_fallback else "今日+本周精选"
-    subject = f"🔬 BME前沿 - {date.today().strftime('%Y-%m-%d')} ({period}, 共{total}篇, 1区{zone1}篇)"
-    ok = send_email(subject, html)
-    print(f"邮件: {'✅' if ok else '❌'}")
-
-    save_cache(cache)
-    print("完成")
-
-
-if __name__ == "__main__":
-    main()
+    # 无内容时
