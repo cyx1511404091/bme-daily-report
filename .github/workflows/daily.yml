@@ -1,0 +1,33 @@
+name: 生物医学工程前沿日报
+
+on:
+  schedule:
+    - cron: "30 0 * * *"  # 北京时间 8:30
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: 运行BME日报
+        run: python bme_report.py
+      - name: 提交更新
+        run: |
+          git config user.name "bme-bot"
+          git config user.email "bme@auto"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "无变更"
+          else
+            git commit -m "BME日报更新 $(date +%Y-%m-%d)"
+            git push
+          fi
