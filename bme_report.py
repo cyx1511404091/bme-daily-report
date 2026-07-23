@@ -1147,4 +1147,20 @@ def main():
             print(f"  无1区/2区新论文")
         time.sleep(1)
 
-    # 无内容时
+    total = sum(len(v) for v in all_papers.values())
+    zone1 = sum(1 for papers in all_papers.values() for p in papers if p.get("zone") == "1区")
+    zone2 = sum(1 for papers in all_papers.values() for p in papers if p.get("zone") == "2区")
+    print(f"\n总计: {total} 篇 (🏆1区: {zone1}, 🥈2区: {zone2}, 今日: {today_count}, 回退: {fallback_count})")
+
+    html = generate_html(all_papers, any_fallback)
+    period = "今日" if not any_fallback else "今日+本周精选"
+    subject = f"🔬 BME前沿 - {date.today().strftime('%Y-%m-%d')} ({period}, 🏆1区{zone1}篇 🥈2区{zone2}篇)"
+    ok = send_email(subject, html)
+    print(f"邮件: {'✅' if ok else '❌'}")
+
+    save_cache(cache)
+    print("完成")
+
+
+if __name__ == "__main__":
+    main()
